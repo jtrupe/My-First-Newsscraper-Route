@@ -1,34 +1,36 @@
 // Dependencies
-var express = require("express");
-var exphbs = require("express-handlebars");
-var mongojs = require("mongojs");
-var mongoose = require("mongoose");
-// Require axios and cheerio. This makes the scraping possible
-var axios = require("axios");
-var cheerio = require("cheerio");
+const express = require("express");
+const exphbs = require("express-handlebars");
+const mongojs = require("mongojs");
+const mongoose = require("mongoose");
+const logger = require("morgan");
+const axios = require("axios");
+const cheerio = require("cheerio");
+
+let PORT = process.env.PORT || 8080;
 
 // Initialize Express
-var app = express();
+const app = express();
+const db = require("./models");
+app.use(logger("dev"));
 
-// Database configuration
-var databaseUrl = "scraper";
-var collections = ["scrapedData"];
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json);
+app.use(express.static("public"));
+app.engine("handlebars", exphbs());
+app.set("view engine", 'handlebars');
 
-// Hook mongojs configuration to the db variable
-var db = mongojs(databaseUrl, collections);
-db.on("error", function(error) {
-  console.log("Database Error:", error);
-});
+mongoose.connect("mongodb://localhost/NewsScraper", { useNewUrlParser: true });
 
 // Main route (simple Hello World Message)
-app.get("/", function(req, res) {
-  res.send("Hello world");
+app.get("/", function (req, res) {
+  res.render("index");
 });
 
 // Retrieve data from the db
-app.get("/all", function(req, res) {
+app.get("/all", function (req, res) {
   // Find all results from the scrapedData collection in the db
-  db.scrapedData.find({}, function(error, found) {
+  db.scrapedData.find({}, function (error, found) {
     // Throw any errors to the console
     if (error) {
       console.log(error);
@@ -41,13 +43,13 @@ app.get("/all", function(req, res) {
 });
 
 // Scrape data from one site and place it into the mongodb db
-app.get("/scrape", function(req, res) {
+app.get("/scrape", function (req, res) {
   // Make a request via axios for the news section of `ycombinator`
-  axios.get("https://news.ycombinator.com/").then(function(response) {
+  axios.get("https://news.ycombinator.com/").then(function (response) {
     // Load the html body from axios into cheerio
     var $ = cheerio.load(response.data);
     // For each element with a "title" class
-    $(".title").each(function(i, element) {
+    $(".title").each(function (i, element) {
       // Save the text and href of each link enclosed in the current element
       var title = $(element).children("a").text();
       var link = $(element).children("a").attr("href");
@@ -59,16 +61,16 @@ app.get("/scrape", function(req, res) {
           title: title,
           link: link
         },
-        function(err, inserted) {
-          if (err) {
-            // Log the error if one is encountered during the query
-            console.log(err);
-          }
-          else {
-            // Otherwise, log the inserted data
-            console.log(inserted);
-          }
-        });
+          function (err, inserted) {
+            if (err) {
+              // Log the error if one is encountered during the query
+              console.log(err);
+            }
+            else {
+              // Otherwise, log the inserted data
+              console.log(inserted);
+            }
+          });
       }
     });
   });
@@ -78,7 +80,7 @@ app.get("/scrape", function(req, res) {
 });
 
 
-// Listen on port 3000
-app.listen(3000, function() {
-  console.log("App running on port 3000!");
+// Listen on port 8080
+app.listen(PORT, function () {
+  console.log("App running on port: " + PORT);
 });
